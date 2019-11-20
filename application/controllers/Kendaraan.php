@@ -17,15 +17,18 @@ parent::__construct();
 $this->load->model('KendaraanModel');
 
 $this->load->library('form_validation');
+$this->load->helper(['jwt','authorization']);
 
 }
 
-public function index_get(){
-
-return $this->returnData($this->db->get('vehicles')->result(), false);
-
-
-}
+public function index_get(){ 
+    $data = $this->verify_request();
+    $status = parent::HTTP_OK;
+    if($data['status'] == 401){
+        return $this->returnData($data['msg'], true);
+    }
+    return $this->returnData($this->db->get('branches')->result(), false); 
+} 
 
 public function index_post($id = null){ 
     
@@ -109,26 +112,52 @@ return $this->returnData($response['msg'], $response['error']);
 
 }
 
-public function index_delete($id = null){ if($id == null){
-
-return $this->returnData('Parameter Id Tidak Ditemukan', true);
-
+public function index_delete($id = null){ 
+    if($id == null){ 
+        return $this->returnData('Parameter Id Tidak Ditemukan', true); 
+    } 
+    $response = $this->BengkelModel->destroy($id); 
+    return $this->returnData($response['msg'], $response['error']); 
+} 
+public function returnData($msg,$error){ 
+    $response['error']=$error; 
+    $response['message']=$msg; 
+    return $this->response($response); 
+} 
+private function verify_request()
+{
+// Get all the headers
+$headers = $this->input->request_headers();
+if(!empty($headers['Authorization'])){
+    $header = $headers['Authorization'];
+}else{
+    $status = parent::HTTP_UNAUTHORIZED;
+    $response = ['status' => $status, 'msg' => 'Unauthorized Access!'];
+    return $response;
 }
-
-$response = $this->KendaraanModel->destroy($id);
-
-return $this->returnData($response['msg'], $response['error']);
-
-
+// $token = explode(" ",$header)[1];
+try {
+    // Validate the token
+    // Successfull validation will return the decoded user data else returns false
+    $data = AUTHORIZATION::validateToken($header);
+    if ($data === false) {
+        $status = parent::HTTP_UNAUTHORIZED;
+        $response = ['status' => $status, 'msg' => 'Unauthorized Access!'];
+        // $this->response($response, $status);
+        // exit();
+    } else {
+        $response = ['status' => 200 , 'msg' => $data];
+    }
+    return $response;
+} catch (Exception $e) {
+    // Token is invalid
+    // Send the unathorized access message
+    $status = parent::HTTP_UNAUTHORIZED;
+    $response = ['status' => $status, 'msg' => 'Unauthorized Access! '];
+    return $response;
 }
-
-public function returnData($msg,$error){ $response['error']=$error; $response['message']=$msg;
-
-return $this->response($response);
-
 }
-
-}
+} 
 
 Class KendaraanData{
 
